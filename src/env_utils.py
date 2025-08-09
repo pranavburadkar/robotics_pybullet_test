@@ -74,13 +74,13 @@ def apply_robot_action(robot_id, action):
     
     # For r2d2, we can either use resetBaseVelocity or control wheel joints if they exist
     if action == 0:  # Move forward
-        p.resetBaseVelocity(robot_id, linearVelocity=[5.0, 0, 0])
+        p.resetBaseVelocity(robot_id, linearVelocity=[15.0, 0, 0])
         print("Action: Move forward")
     elif action == 1:  # Turn left
         p.resetBaseVelocity(robot_id, linearVelocity=[0, 0, 0], angularVelocity=[0, 0, 6.0])
         print("Action: Turn left")
     elif action == 2:  # Turn right
-        p.resetBaseVelocity(robot_id, linearVelocity=[0, 0, 0], angularVelocity=[0, 0, -6.0])
+        p.resetBaseVelocity(robot_id, linearVelocity=[0, 0, 0], angularVelocity=[0, 0, -12.0])
         print("Action: Turn right")
     else:  # Stop
         p.resetBaseVelocity(robot_id, linearVelocity=[0, 0, 0], angularVelocity=[0, 0, 0])
@@ -109,6 +109,7 @@ def simulate_lidar(robot_id, num_rays=16, ray_length=5.0, show_lasers=False):
     # Perform raycast
     ray_results = p.rayTestBatch(rays_from, rays_to)
     distances = []
+    hit_points = []
     
     if show_lasers:
         p.removeAllUserDebugItems()
@@ -121,11 +122,13 @@ def simulate_lidar(robot_id, num_rays=16, ray_length=5.0, show_lasers=False):
             distance = hit_fraction * ray_length
             if show_lasers:
                 p.addUserDebugLine(rays_from[i], hit_position, [1, 0, 0], lineWidth=2) # Red for hit
+            hit_points.append(hit_position)
         else:
             distance = ray_length
             if show_lasers:
                 p.addUserDebugLine(rays_from[i], rays_to[i], [0, 1, 0], lineWidth=2) # Green for no hit
+            hit_points.append(rays_to[i])
 
         distances.append(distance)
     
-    return np.array(distances)
+    return np.array(distances), np.array(hit_points)

@@ -1,6 +1,6 @@
 import time
 import numpy as np
-from config import MAP_SIZE, LIDAR_RAYS, LIDAR_RANGE, PARTICLE_COUNT, RL_ACTIONS, MOTION_MODE
+from config import MAP_SIZE, LIDAR_RAYS, LIDAR_RANGE, PARTICLE_COUNT, RL_ACTIONS, MOTION_MODE, STATE_SPACE_SIZE
 from env_utils import setup_sim, get_odometry, apply_robot_action, simulate_lidar
 from markov_localization import MarkovLocalization
 from grid_slam import GridSLAM
@@ -36,6 +36,7 @@ def run():
     step_count = 0
     prev_pose = None
     prev_scan = None
+    prev_scan_points = None
     path = []
     action = 3 # Default action is STOP
 
@@ -43,7 +44,7 @@ def run():
         while True:
             # Get current robot state
             current_pose = get_odometry(robot_id)
-            scan = simulate_lidar(robot_id, LIDAR_RAYS, LIDAR_RANGE, show_lasers=True)
+            scan, scan_points = simulate_lidar(robot_id, LIDAR_RAYS, LIDAR_RANGE, show_lasers=True)
             
             # Calculate motion since last step (odometry)
             if prev_pose is not None:
@@ -60,8 +61,8 @@ def run():
             est_pose = mcl.get_estimated_pose()
             
             # (Optional) Refine pose estimate with PL-ICP
-            if prev_scan is not None:
-                est_pose = pl_icp_correction(scan, prev_scan, est_pose)
+            if prev_scan_points is not None:
+                est_pose = pl_icp_correction(scan_points, prev_scan_points, est_pose)
             
             # 2. MAPPING (SLAM)
             slam.update(est_pose, scan)
@@ -80,8 +81,13 @@ def run():
                 # RL Agent: Choose action based on exploration reward
                 num_unknown = np.sum(grid_map == 0)
                 reward = num_unknown / (MAP_SIZE[0] * MAP_SIZE[1])
-                action = rl_agent.select_action(0)
-                rl_agent.update(action, reward)
+                current_state = rl_agent._discretize_state(num_unknown, MAP_SIZE[0] * MAP_SIZE[1])
+                action = rl_agent.select_action(current_state)
+                
+                next_num_unknown = np.sum(slam.get_map() == 0)
+                next_state = rl_agent._discretize_state(next_num_unknown, MAP_SIZE[0] * MAP_SIZE[1])
+                rl_agent.update(current_state, action, reward, next_state)
+
             elif MOTION_MODE == 'ASTAR':
                 # A* Path Following
                 if not path or step_count % 60 == 0: # Re-plan every 2 seconds or if no path
@@ -126,6 +132,7 @@ def run():
             # Update state for next iteration
             prev_pose = current_pose.copy()
             prev_scan = scan.copy()
+            prev_scan_points = scan_points.copy()
             
             # Print status every 10 steps
             if step_count % 10 == 0:
