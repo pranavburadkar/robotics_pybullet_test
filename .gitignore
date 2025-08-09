@@ -1,0 +1,34 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+*.pyd
+*.so
+
+# Environments
+.venv/
+venv/
+env/
+
+# Editor/IDE specific files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Log files
+*.log
+
+# Database files
+db.sqlite3
+
+# Media and static files (if not tracked)
+media/
+static/
+
+# Build artifacts
+build/
+dist/
+
+# Sensitive information
+local_settings.py
+.env
