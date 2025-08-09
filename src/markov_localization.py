@@ -113,3 +113,7 @@ class MarkovLocalization:
         mean_theta_y = np.mean([np.sin(p.theta) for p in self.particles])
         mean_theta = np.arctan2(mean_theta_y, mean_theta_x)
         return np.array([mean_x, mean_y, mean_theta])
+
+    def get_particles(self):
+        """Return the current set of particles."""
+        return self.particles

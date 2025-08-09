@@ -10,6 +10,11 @@ def setup_sim(gui=True):
     p.resetSimulation()
     p.setGravity(0, 0, -9.81)
     p.setTimeStep(1./240.)
+
+    # Configure visualizer
+    p.configureDebugVisualizer(p.COV_ENABLE_SHADOWS, 1)
+    p.configureDebugVisualizer(p.COV_ENABLE_GUI, 1)
+    p.resetDebugVisualizerCamera(cameraDistance=15, cameraYaw=0, cameraPitch=-89.9, cameraTargetPosition=[7.5, 7.5, 0])
     
     # Load ground plane
     plane_id = p.loadURDF("plane.urdf")
@@ -115,11 +120,11 @@ def simulate_lidar(robot_id, num_rays=16, ray_length=5.0, show_lasers=False):
         if hit_fraction < 1.0:
             distance = hit_fraction * ray_length
             if show_lasers:
-                p.addUserDebugLine(rays_from[i], hit_position, [1, 0, 0]) # Red for hit
+                p.addUserDebugLine(rays_from[i], hit_position, [1, 0, 0], lineWidth=2) # Red for hit
         else:
             distance = ray_length
             if show_lasers:
-                p.addUserDebugLine(rays_from[i], rays_to[i], [0, 1, 0]) # Green for no hit
+                p.addUserDebugLine(rays_from[i], rays_to[i], [0, 1, 0], lineWidth=2) # Green for no hit
 
         distances.append(distance)
     
