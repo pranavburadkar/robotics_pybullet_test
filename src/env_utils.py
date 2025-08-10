@@ -79,14 +79,14 @@ def apply_robot_action(robot_id, action, forward_speed=5.0, turn_speed=3.0):
         # Calculate linear velocity components based on current yaw
         vx = forward_speed * math.cos(yaw)
         vy = forward_speed * math.sin(yaw)
-        p.resetBaseVelocity(robot_id, linearVelocity=[vx, vy, 0])
-        print("Action: Move forward")
+        p.resetBaseVelocity(robot_id, linearVelocity=[vx, vy, 0], angularVelocity=[0, 0, turn_speed])
+        print(f"Action: Move forward (speed={forward_speed:.2f}, turn={turn_speed:.2f})")
     elif action == 1:  # Turn left
         p.resetBaseVelocity(robot_id, linearVelocity=[0, 0, 0], angularVelocity=[0, 0, turn_speed])
-        print("Action: Turn left")
+        print(f"Action: Turn left (speed={turn_speed:.2f})")
     elif action == 2:  # Turn right
         p.resetBaseVelocity(robot_id, linearVelocity=[0, 0, 0], angularVelocity=[0, 0, -turn_speed])
-        print("Action: Turn right")
+        print(f"Action: Turn right (speed={turn_speed:.2f})")
     else:  # Stop
         p.resetBaseVelocity(robot_id, linearVelocity=[0, 0, 0], angularVelocity=[0, 0, 0])
         print("Action: Stop")

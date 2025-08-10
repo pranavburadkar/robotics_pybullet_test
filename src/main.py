@@ -154,16 +154,14 @@ def run():
                     angle_diff = (desired_angle - est_pose[2] + np.pi) % (2 * np.pi) - np.pi
 
                     # P-controller for turning
-                    kp = 1.0 # Reduced gain
+                    kp = 1.0
                     turn_speed = kp * angle_diff
 
-                    # Move forward if angle is small enough, otherwise just turn
-                    if abs(angle_diff) < 0.5:
-                        action = 0 # Move forward
-                        apply_robot_action(robot_id, action, turn_speed=turn_speed)
-                    else:
-                        action = 1 if angle_diff > 0 else 2 # Turn left or right
-                        apply_robot_action(robot_id, action, turn_speed=abs(turn_speed))
+                    # Constant forward speed
+                    forward_speed = 5.0
+
+                    # Apply both forward and turn speeds
+                    apply_robot_action(robot_id, 0, forward_speed=forward_speed, turn_speed=turn_speed)
 
                     if dist_to_target < 0.5: # If very close to waypoint, pop it
                         path.pop(0)
@@ -175,6 +173,7 @@ def run():
                             print(f"   - Time Taken: {time_taken:.2f} seconds")
                             print(f"   - Distance Traveled: {total_distance:.2f} meters")
                             print("="*50 + "\n")
+                            apply_robot_action(robot_id, 3) # Stop the robot
                         else:
                             target_waypoint = path[0] # Update target
 
@@ -198,14 +197,12 @@ def run():
                             action = 3 # Stop for a moment before re-planning
                             print("DEBUG: Exploration cycle complete. Stopping.")
                         exploration_step_count += 1
+                        apply_robot_action(robot_id, action)
 
                 # Reset exploration mode if a path is found
                 if path:
                     exploration_mode = False
                     exploration_step_count = 0
-
-            if not (path and abs(angle_diff) > 0.5):
-                apply_robot_action(robot_id, action)
 
             # Update state for next iteration
             prev_pose = current_pose.copy()

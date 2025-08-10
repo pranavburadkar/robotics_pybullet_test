@@ -3,12 +3,15 @@ import numpy as np
 class GridSLAM:
     def __init__(self, map_size):
         self.map = np.zeros(map_size)
+        self.log_odds_free = -0.4
+        self.log_odds_occupied = 0.8
+
         # Mark boundaries as obstacles
         rows, cols = map_size
-        self.map[0, :] = 1.0  # Top boundary
-        self.map[rows - 1, :] = 1.0  # Bottom boundary
-        self.map[:, 0] = 1.0  # Left boundary
-        self.map[:, cols - 1] = 1.0  # Right boundary
+        self.map[0, :] = 100 # A large log-odds value for occupied
+        self.map[rows - 1, :] = 100
+        self.map[:, 0] = 100
+        self.map[:, cols - 1] = 100
 
     def update(self, pose, scan):
         # Ensure pose is within map bounds before updating
@@ -26,16 +29,11 @@ class GridSLAM:
                 
                 if 0 <= x < self.map.shape[0] and 0 <= y < self.map.shape[1]:
                     if r < dist - 0.2:  # Free space
-                        self.map[x, y] = max(self.map[x, y] - 0.1, 0)
+                        self.map[x, y] += self.log_odds_free
                     else:  # Occupied space
-                        self.map[x, y] = min(self.map[x, y] + 0.8, 1) # Increased occupancy value
-                        # Inflate neighbors
-                        for dx in [-1, 0, 1]: # Reduced inflation radius
-                            for dy in [-1, 0, 1]: # Reduced inflation radius
-                                if dx == 0 and dy == 0: continue
-                                nx, ny = x + dx, y + dy
-                                if 0 <= nx < self.map.shape[0] and 0 <= ny < self.map.shape[1]:
-                                    self.map[nx, ny] = min(self.map[nx, ny] + 0.2, 1) # Reduced inflation amount
+                        self.map[x, y] += self.log_odds_occupied
 
     def get_map(self):
-        return self.map
+        # Convert log-odds map to probability map
+        prob_map = 1.0 - 1.0 / (1.0 + np.exp(self.map))
+        return prob_map
