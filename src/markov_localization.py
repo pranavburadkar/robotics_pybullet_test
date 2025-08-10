@@ -1,4 +1,5 @@
 import numpy as np
+from numba import jit
 
 class Particle:
     """A simple data structure for a particle in the filter."""
@@ -7,6 +8,38 @@ class Particle:
         self.y = y
         self.theta = theta
         self.weight = weight
+
+@jit(nopython=True)
+def _calculate_particle_weight_jit(particle_x, particle_y, particle_theta, lidar_scan, grid_map):
+    """Calculate the likelihood of a measurement given a particle's pose."""
+    weight = 1.0
+    num_rays = len(lidar_scan)
+    for i, measured_dist in enumerate(lidar_scan):
+        angle = particle_theta + (i * 2 * np.pi / num_rays)
+        expected_dist = _raycast_on_grid_jit(particle_x, particle_y, angle, grid_map, 5.0) # max_range from config
+        
+        # Compare expected vs. measured distance using a Gaussian model
+        error = measured_dist - expected_dist
+        # The smaller the error, the higher the probability (and weight)
+        prob = np.exp(-(error**2) / (2 * 2.0**2))  # Sensor noise variance
+        weight *= prob
+    return weight
+
+@jit(nopython=True)
+def _raycast_on_grid_jit(particle_x, particle_y, angle, grid_map, max_range):
+    """Simulate a Lidar ray on the occupancy grid to find expected distance."""
+    map_shape_x = grid_map.shape[0]
+    map_shape_y = grid_map.shape[1]
+    for r_idx in range(0, int(max_range / 0.05)): # Step along the ray
+        r = r_idx * 0.05
+        x = int(particle_x + r * np.cos(angle))
+        y = int(particle_y + r * np.sin(angle))
+
+        if not (0 <= x < map_shape_x and 0 <= y < map_shape_y):
+            return max_range  # Ray went out of map bounds
+        if grid_map[x, y] > 0.5:  # Obstacle threshold
+            return r  # Ray hit an obstacle
+    return max_range  # No obstacle hit within range
 
 class MarkovLocalization:
     """
@@ -47,7 +80,7 @@ class MarkovLocalization:
         and then resample the particles.
         """
         for p in self.particles:
-            p.weight = self._calculate_particle_weight(p, lidar_scan, grid_map)
+            p.weight = _calculate_particle_weight_jit(p.x, p.y, p.theta, lidar_scan, grid_map)
 
         # Normalize weights to form a probability distribution
         total_weight = sum(p.weight for p in self.particles)
@@ -60,33 +93,6 @@ class MarkovLocalization:
                 p.weight /= total_weight
 
         self._resample_particles()
-
-    def _calculate_particle_weight(self, particle, lidar_scan, grid_map):
-        """Calculate the likelihood of a measurement given a particle's pose."""
-        weight = 1.0
-        num_rays = len(lidar_scan)
-        for i, measured_dist in enumerate(lidar_scan):
-            angle = particle.theta + (i * 2 * np.pi / num_rays)
-            expected_dist = self._raycast_on_grid(particle, angle, grid_map)
-            
-            # Compare expected vs. measured distance using a Gaussian model
-            error = measured_dist - expected_dist
-            # The smaller the error, the higher the probability (and weight)
-            prob = np.exp(-(error**2) / (2 * 2.0**2))  # Sensor noise variance
-            weight *= prob
-        return weight
-
-    def _raycast_on_grid(self, particle, angle, grid_map, max_range=5.0):
-        """Simulate a Lidar ray on the occupancy grid to find expected distance."""
-        for r in np.arange(0, max_range, 0.05):  # Step along the ray
-            x = int(particle.x + r * np.cos(angle))
-            y = int(particle.y + r * np.sin(angle))
-
-            if not (0 <= x < self.map_shape[0] and 0 <= y < self.map_shape[1]):
-                return max_range  # Ray went out of map bounds
-            if grid_map[x, y] > 0.5:  # Obstacle threshold
-                return r  # Ray hit an obstacle
-        return max_range  # No obstacle hit within range
 
     def _resample_particles(self):
         """Resample particles based on their weights (low variance sampling)."""

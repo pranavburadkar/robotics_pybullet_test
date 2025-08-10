@@ -1,2 +1,4 @@
 pybullet
 numpy
+numba
+scipy

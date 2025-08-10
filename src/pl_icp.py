@@ -1,5 +1,7 @@
 import numpy as np
+from numba import jit
 
+@jit(nopython=True)
 def pl_icp_correction(current_scan_points, previous_scan_points, pose_guess, iterations=10):
     """Basic 2D Point-to-Point ICP for pose correction."""
     # Extract x, y coordinates, ignoring z for 2D ICP
@@ -25,7 +27,8 @@ def pl_icp_correction(current_scan_points, previous_scan_points, pose_guess, ite
         # For each point in transformed_current_points, find its nearest neighbor in previous_points
         correspondences = []
         for p_curr in transformed_current_points:
-            distances = np.linalg.norm(previous_points - p_curr, axis=1)
+            diff = previous_points - p_curr
+            distances = np.sqrt(np.sum(np.square(diff), axis=1))
             closest_idx = np.argmin(distances)
             correspondences.append((p_curr, previous_points[closest_idx]))
         
@@ -33,12 +36,17 @@ def pl_icp_correction(current_scan_points, previous_scan_points, pose_guess, ite
             break # No correspondences found
 
         # Separate corresponding points
-        P = np.array([corr[0] for corr in correspondences]) # Transformed current points
-        Q = np.array([corr[1] for corr in correspondences]) # Corresponding previous points
+        # Pre-allocate arrays for Numba compatibility
+        P = np.empty((len(correspondences), 2), dtype=np.float64)
+        Q = np.empty((len(correspondences), 2), dtype=np.float64)
+
+        for k in range(len(correspondences)):
+            P[k] = correspondences[k][0]
+            Q[k] = correspondences[k][1]
 
         # Compute centroids
-        centroid_P = np.mean(P, axis=0)
-        centroid_Q = np.mean(Q, axis=0)
+        centroid_P = np.array([np.mean(P[:, 0]), np.mean(P[:, 1])])
+        centroid_Q = np.array([np.mean(Q[:, 0]), np.mean(Q[:, 1])])
 
         # Center the points
         P_centered = P - centroid_P
