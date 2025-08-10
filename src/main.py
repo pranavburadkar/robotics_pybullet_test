@@ -40,6 +40,8 @@ def run():
     path = []
     action = 3 # Default action is STOP
     turn_attempts = 0 # New variable to track consecutive turns when no path is found
+    exploration_mode = False
+    exploration_step_count = 0
 
     try:
         while True:
@@ -158,19 +160,32 @@ def run():
                         action = 0 # Move forward
 
                 else:
-                    # No path found, try turning to find a new path
-                    if turn_attempts < 5: # Limit consecutive turns
-                        action = 1 # Turn left
-                        turn_attempts += 1
-                        print(f"DEBUG: No path found. Attempting to turn (attempt {turn_attempts}).")
-                    else:
-                        action = 3 # Stop if too many turn attempts
-                        turn_attempts = 0 # Reset attempts
-                        print(f"DEBUG: Robot stopped at ({est_pose[0]:.2f}, {est_pose[1]:.2f}) after {turn_attempts} failed turn attempts.")
-                
-                # Reset turn_attempts if a path is found
+                    # No path found, enter exploration mode
+                    if not exploration_mode:
+                        exploration_mode = True
+                        exploration_step_count = 0
+                        print("DEBUG: No path found. Entering exploration mode.")
+
+                    # Exploration logic
+                    if exploration_mode:
+                        if exploration_step_count < 10: # Move forward for 10 steps
+                            action = 0 # Move forward
+                            print(f"DEBUG: Exploration: Moving forward (step {exploration_step_count + 1}).")
+                        elif exploration_step_count < 15: # Then turn left for 5 steps
+                            action = 1 # Turn left
+                            print(f"DEBUG: Exploration: Turning left (step {exploration_step_count + 1}).")
+                        else:
+                            # Exit exploration mode after a cycle
+                            exploration_mode = False
+                            exploration_step_count = 0
+                            action = 3 # Stop for a moment before re-planning
+                            print("DEBUG: Exploration cycle complete. Stopping.")
+                        exploration_step_count += 1
+
+                # Reset exploration mode if a path is found
                 if path:
-                    turn_attempts = 0
+                    exploration_mode = False
+                    exploration_step_count = 0
 
             apply_robot_action(robot_id, action)
 

@@ -10,7 +10,7 @@ class GridSLAM:
             angle = pose[2] + i * (2 * np.pi / len(scan))
             
             # Trace ray from robot to hit point
-            for r in np.linspace(0, dist, int(dist*10) + 1):
+            for r in np.linspace(0, dist, int(dist*20) + 1):
                 x = int(pose[0] + r * np.cos(angle))
                 y = int(pose[1] + r * np.sin(angle))
                 
@@ -19,6 +19,13 @@ class GridSLAM:
                         self.map[x, y] = max(self.map[x, y] - 0.1, 0)
                     else:  # Occupied space
                         self.map[x, y] = min(self.map[x, y] + 0.3, 1)
+                        # Inflate neighbors
+                        for dx in [-1, 0, 1]:
+                            for dy in [-1, 0, 1]:
+                                if dx == 0 and dy == 0: continue
+                                nx, ny = x + dx, y + dy
+                                if 0 <= nx < self.map.shape[0] and 0 <= ny < self.map.shape[1]:
+                                    self.map[nx, ny] = min(self.map[nx, ny] + 0.1, 1) # Inflate by a smaller amount
 
     def get_map(self):
         return self.map

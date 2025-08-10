@@ -77,8 +77,8 @@ def apply_robot_action(robot_id, action):
     # For r2d2, we can either use resetBaseVelocity or control wheel joints if they exist
     if action == 0:  # Move forward
         # Calculate linear velocity components based on current yaw
-        vx = 15.0 * math.cos(yaw)
-        vy = 15.0 * math.sin(yaw)
+        vx = 25.0 * math.cos(yaw)
+        vy = 25.0 * math.sin(yaw)
         p.resetBaseVelocity(robot_id, linearVelocity=[vx, vy, 0])
         print("Action: Move forward")
     elif action == 1:  # Turn left
