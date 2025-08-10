@@ -30,12 +30,12 @@ class GridSLAM:
                     else:  # Occupied space
                         self.map[x, y] = min(self.map[x, y] + 0.8, 1) # Increased occupancy value
                         # Inflate neighbors
-                        for dx in [-2, -1, 0, 1, 2]: # Increased inflation radius
-                            for dy in [-2, -1, 0, 1, 2]: # Increased inflation radius
+                        for dx in [-1, 0, 1]: # Reduced inflation radius
+                            for dy in [-1, 0, 1]: # Reduced inflation radius
                                 if dx == 0 and dy == 0: continue
                                 nx, ny = x + dx, y + dy
                                 if 0 <= nx < self.map.shape[0] and 0 <= ny < self.map.shape[1]:
-                                    self.map[nx, ny] = min(self.map[nx, ny] + 0.4, 1) # Inflate by a larger amount
+                                    self.map[nx, ny] = min(self.map[nx, ny] + 0.2, 1) # Reduced inflation amount
 
     def get_map(self):
         return self.map

@@ -77,8 +77,6 @@ def run():
             est_pose[1] = np.clip(est_pose[1], 0, MAP_SIZE[1]-1)
             
             # 2. MAPPING (SLAM)
-            
-            # 2. MAPPING (SLAM)
             slam.update(est_pose, scan)
 
             # 3. VISUALIZE PARTICLES
@@ -155,10 +153,19 @@ def run():
                     desired_angle = np.arctan2(delta_y, delta_x)
                     angle_diff = (desired_angle - est_pose[2] + np.pi) % (2 * np.pi) - np.pi
 
-                    # Prioritize rotation if angle is significantly off
-                    if abs(angle_diff) > 0.5: # Smaller threshold for rotation
-                        action = 1 if angle_diff > 0 else 2 # Turn right or left
-                    elif dist_to_target < 0.5: # If very close to waypoint, pop it
+                    # P-controller for turning
+                    kp = 1.0 # Reduced gain
+                    turn_speed = kp * angle_diff
+
+                    # Move forward if angle is small enough, otherwise just turn
+                    if abs(angle_diff) < 0.5:
+                        action = 0 # Move forward
+                        apply_robot_action(robot_id, action, turn_speed=turn_speed)
+                    else:
+                        action = 1 if angle_diff > 0 else 2 # Turn left or right
+                        apply_robot_action(robot_id, action, turn_speed=abs(turn_speed))
+
+                    if dist_to_target < 0.5: # If very close to waypoint, pop it
                         path.pop(0)
                         if not path:
                             action = 3 # Stop, path complete
@@ -170,9 +177,6 @@ def run():
                             print("="*50 + "\n")
                         else:
                             target_waypoint = path[0] # Update target
-                            action = 0 # Move forward to next waypoint
-                    else:
-                        action = 0 # Move forward
 
                 else:
                     # No path found, enter exploration mode
@@ -185,10 +189,8 @@ def run():
                     if exploration_mode:
                         if exploration_step_count < 10: # Move forward for 10 steps
                             action = 0 # Move forward
-                            print(f"DEBUG: Exploration: Moving forward (step {exploration_step_count + 1}).")
                         elif exploration_step_count < 15: # Then turn left for 5 steps
                             action = 1 # Turn left
-                            print(f"DEBUG: Exploration: Turning left (step {exploration_step_count + 1}).")
                         else:
                             # Exit exploration mode after a cycle
                             exploration_mode = False
@@ -202,7 +204,8 @@ def run():
                     exploration_mode = False
                     exploration_step_count = 0
 
-            apply_robot_action(robot_id, action)
+            if not (path and abs(angle_diff) > 0.5):
+                apply_robot_action(robot_id, action)
 
             # Update state for next iteration
             prev_pose = current_pose.copy()

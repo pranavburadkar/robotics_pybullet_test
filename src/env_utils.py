@@ -67,7 +67,7 @@ def get_odometry(robot_id):
     euler = p.getEulerFromQuaternion(orn)
     return np.array([pos[0], pos[1], euler[2]])  # x, y, yaw
 
-def apply_robot_action(robot_id, action):
+def apply_robot_action(robot_id, action, forward_speed=5.0, turn_speed=3.0):
     """Apply movement commands to robot - FIXED VERSION"""
     # Get robot's current orientation
     _, orn = p.getBasePositionAndOrientation(robot_id)
@@ -77,15 +77,15 @@ def apply_robot_action(robot_id, action):
     # For r2d2, we can either use resetBaseVelocity or control wheel joints if they exist
     if action == 0:  # Move forward
         # Calculate linear velocity components based on current yaw
-        vx = 15.0 * math.cos(yaw)
-        vy = 15.0 * math.sin(yaw)
+        vx = forward_speed * math.cos(yaw)
+        vy = forward_speed * math.sin(yaw)
         p.resetBaseVelocity(robot_id, linearVelocity=[vx, vy, 0])
         print("Action: Move forward")
     elif action == 1:  # Turn left
-        p.resetBaseVelocity(robot_id, linearVelocity=[0, 0, 0], angularVelocity=[0, 0, 6.0])
+        p.resetBaseVelocity(robot_id, linearVelocity=[0, 0, 0], angularVelocity=[0, 0, turn_speed])
         print("Action: Turn left")
     elif action == 2:  # Turn right
-        p.resetBaseVelocity(robot_id, linearVelocity=[0, 0, 0], angularVelocity=[0, 0, -12.0])
+        p.resetBaseVelocity(robot_id, linearVelocity=[0, 0, 0], angularVelocity=[0, 0, -turn_speed])
         print("Action: Turn right")
     else:  # Stop
         p.resetBaseVelocity(robot_id, linearVelocity=[0, 0, 0], angularVelocity=[0, 0, 0])
