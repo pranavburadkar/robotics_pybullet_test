@@ -44,6 +44,16 @@ class GridSLAM:
         # Clip log-odds values to prevent overflow and overconfidence
         self.map = np.clip(self.map, -10.0, 10.0) # Example values, can be tuned
 
+        # Debug print: Show a small section of the map around the robot's pose
+        map_x, map_y = self.map.shape
+        px, py = int(pose[0]), int(pose[1])
+        window_size = 5
+        slice_x_min = max(0, px - window_size // 2)
+        slice_x_max = min(map_x, px + window_size // 2 + 1)
+        slice_y_min = max(0, py - window_size // 2)
+        slice_y_max = min(map_y, py + window_size // 2 + 1)
+        print(f"DEBUG: GridSLAM Map around pose ({px},{py}):\n{self.get_map()[slice_x_min:slice_x_max, slice_y_min:slice_y_max]}")
+
     def get_map(self):
         # Convert log-odds map to probability map
         prob_map = 1.0 - 1.0 / (1.0 + np.exp(self.map))

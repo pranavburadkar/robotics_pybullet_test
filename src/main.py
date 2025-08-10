@@ -9,6 +9,36 @@ from rl_agent import RLAgent
 from pl_icp import pl_icp_correction
 import pybullet as p
 
+def find_unexplored_target(grid_map, current_pose_grid):
+    """
+    Finds a target point in an unexplored region of the grid map.
+    For simplicity, this version finds a random unknown cell.
+    A more advanced version would find frontiers or largest unknown areas.
+    """
+    unknown_cells = np.argwhere((grid_map > 0.4) & (grid_map < 0.6)) # Cells close to 0.5 probability
+    
+    if len(unknown_cells) == 0:
+        return None # No unexplored cells found
+
+    # Filter out unknown cells that are too close to the robot's current position
+    # to encourage moving to new areas
+    valid_unknown_cells = []
+    for cell in unknown_cells:
+        dist = np.linalg.norm(cell - current_pose_grid[:2])
+        if dist > 10: # Only consider cells at least 10 grid units away
+            valid_unknown_cells.append(cell)
+    
+    if len(valid_unknown_cells) == 0:
+        # If all unknown cells are too close, just pick a random one from all unknown cells
+        target_cell_idx = np.random.choice(len(unknown_cells))
+        target_cell = unknown_cells[target_cell_idx]
+    else:
+        # Pick a random valid unknown cell
+        target_cell_idx = np.random.choice(len(valid_unknown_cells))
+        target_cell = valid_unknown_cells[target_cell_idx]
+
+    return (int(target_cell[0]), int(target_cell[1]))
+
 def run():
     print("Setting up PyBullet simulation...")
     robot_id = setup_sim(gui=True)
@@ -19,7 +49,8 @@ def run():
     rl_agent = RLAgent(RL_ACTIONS)
     
     # Goal coordinates for path planning
-    goal_coords = (13, 13)
+    goal_coords_meters = (13, 13)
+    goal_coords = (int(goal_coords_meters[0] / 0.05), int(goal_coords_meters[1] / 0.05))
     
     print("="*50)
     print("🤖 ASSIGNMENT 2: Multi-Sensor Robot Navigation")
@@ -42,7 +73,7 @@ def run():
     prev_scan_points = None
     path = []
     action = 3 # Default action is STOP
-    turn_attempts = 0 # New variable to track consecutive turns when no path is found
+    
     exploration_mode = False
     exploration_step_count = 0
     collision_avoidance_mode = False # New state variable
@@ -53,50 +84,45 @@ def run():
             current_pose = get_odometry(robot_id)
             scan, scan_points = simulate_lidar(robot_id, LIDAR_RAYS, LIDAR_RANGE, show_lasers=True)
             
-            # Collision Avoidance: Check for imminent collisions
-            collision_threshold = 1.0 # meters (Increased threshold)
-            if np.min(scan) < collision_threshold:
-                print(f"⚠️ COLLISION IMMINENT! Min scan distance: {np.min(scan):.2f}. Initiating evasive maneuver.")
-                collision_avoidance_mode = True
-                # Determine turn direction based on closest obstacle
-                closest_ray_idx = np.argmin(scan)
-                # If closest obstacle is on the left half of LIDAR rays, turn right, else turn left
-                turn_direction = 1.0 if closest_ray_idx < LIDAR_RAYS / 2 else -1.0
-                
-                # Evasive maneuver: Back up and turn
-                apply_robot_action(robot_id, 0, forward_speed=-5.0, turn_speed=turn_direction * 5.0) # Back up and turn aggressively
-                for _ in range(int(2.0 / (1./240.))): # 2.0 second duration
-                    p.stepSimulation()
-                apply_robot_action(robot_id, 3) # Stop after backing up
-                for _ in range(int(1.0 / (1./240.))): # 1.0 second duration
-                    p.stepSimulation()
-                continue # Skip the rest of the loop to prioritize collision avoidance
-            elif collision_avoidance_mode: # If previously in collision avoidance, but now clear
-                collision_avoidance_mode = False
-                exploration_mode = True # Enter exploration mode to find a new path after escaping collision
-                exploration_step_count = 0
-                print("✅ Collision avoided. Entering exploration mode.")
+            # Collision Avoidance: Proximity-based behavior
+            collision_threshold = 0.7 # meters (closer threshold for direct avoidance)
+            warning_threshold = 2.0   # meters (earlier warning for slowdown/gentle turn)
 
-            # If in collision avoidance mode, skip normal navigation logic
-            if collision_avoidance_mode:
-                # If still in collision, continue evasive maneuver
-                if np.min(scan) < collision_threshold:
-                    # Re-apply evasive maneuver (no print to avoid spamming)
-                    closest_ray_idx = np.argmin(scan)
-                    turn_direction = 1.0 if closest_ray_idx < LIDAR_RAYS / 2 else -1.0
-                    apply_robot_action(robot_id, 0, forward_speed=0.0, turn_speed=turn_direction * 10.0) # Turn in place aggressively
-                for _ in range(int(1.0 / (1./240.))): # 1.0 second duration
-                    p.stepSimulation()
-                apply_robot_action(robot_id, 3) # Stop after turning
+            current_min_scan = np.min(scan)
+            
+            # Determine turn direction based on closest obstacle
+            closest_ray_idx = np.argmin(scan)
+            turn_direction = 1.0 if closest_ray_idx < LIDAR_RAYS / 2 else -1.0 # Turn away from obstacle
+
+            if current_min_scan < collision_threshold:
+                # Imminent collision: aggressive but not "jumping"
+                print(f"⚠️ COLLISION IMMINENT! Min scan distance: {current_min_scan:.2f}. Initiating evasive maneuver.")
+                collision_avoidance_mode = True
+                # Back up slightly and turn
+                forward_speed = -2.0 # Slower reverse
+                turn_speed = turn_direction * 3.0 # Moderate turn
+                apply_robot_action(robot_id, 0, forward_speed=forward_speed, turn_speed=turn_speed)
+                # Continue for a short duration, then let normal loop take over
                 for _ in range(int(0.5 / (1./240.))): # 0.5 second duration
                     p.stepSimulation()
-                    continue
-                else:
-                    # Collision avoided, transition out of mode
-                    collision_avoidance_mode = False
-                    exploration_mode = True # Enter exploration mode to find a new path
-                    exploration_step_count = 0
-                    print("✅ Collision avoided. Resuming exploration.")
+                # No 'continue' here, allow normal navigation logic to resume
+                # This makes it less "jumpy" and more continuous
+            elif current_min_scan < warning_threshold:
+                # Warning zone: slow down and gentle turn
+                print(f"🚧 OBSTACLE AHEAD! Min scan distance: {current_min_scan:.2f}. Slowing down and adjusting course.")
+                collision_avoidance_mode = True # Still in avoidance mode, but gentler
+                # Proportional slowdown: closer to obstacle, slower speed
+                forward_speed = 5.0 * (current_min_scan / warning_threshold) # Scale speed down
+                forward_speed = max(1.0, forward_speed) # Ensure minimum forward speed
+                turn_speed = turn_direction * 1.0 # Gentle turn
+                apply_robot_action(robot_id, 0, forward_speed=forward_speed, turn_speed=turn_speed)
+                # No 'continue', allow normal navigation logic to resume
+            elif collision_avoidance_mode: # If previously in avoidance, but now clear
+                collision_avoidance_mode = False
+                exploration_mode = True # Transition to exploration
+                exploration_step_count = 0
+                print("✅ Collision avoided. Entering exploration mode.")
+            # else: normal navigation logic (A* or RL) will apply
 
             # Calculate motion since last step (odometry)
             if prev_pose is not None:
@@ -115,8 +141,8 @@ def run():
             est_pose = mcl.get_estimated_pose()
             
             # (Optional) Refine pose estimate with PL-ICP
-            # if prev_scan_points is not None:
-            #     est_pose = pl_icp_correction(np.ascontiguousarray(scan_points), np.ascontiguousarray(prev_scan_points), est_pose)
+            if prev_scan_points is not None:
+                est_pose = pl_icp_correction(np.ascontiguousarray(scan_points), np.ascontiguousarray(prev_scan_points), est_pose)
 
             # Clip estimated pose to be within map boundaries
             est_pose[0] = np.clip(est_pose[0], 0, MAP_SIZE[0]-1)
@@ -128,7 +154,12 @@ def run():
             # 3. VISUALIZE PARTICLES
             particles = mcl.get_particles()
             if particles:
-                positions = [[p.x, p.y, 0.1] for p in particles]
+                # Scale particle positions from map cells to meters for visualization
+                # Assuming 15x15 meter environment and 300x300 map cells
+                # Scaling factor = 15.0 / MAP_SIZE[0]
+                scaling_factor = 15.0 / MAP_SIZE[0]
+
+                positions = [[p.x * scaling_factor, p.y * scaling_factor, 0.1] for p in particles]
                 weights = [p.weight for p in particles]
                 max_w = max(weights) if max(weights) > 0 else 1.0
                 colors = [[1 - (w/max_w), (w/max_w), 0] for w in weights]
@@ -153,6 +184,7 @@ def run():
                         current_grid_pos = (int(est_pose[0]), int(est_pose[1]))
                         print(f"DEBUG: Current Grid Pos: {current_grid_pos}, Goal Coords: {goal_coords}")
                         print(f"DEBUG: Grid Map Shape: {grid_map.shape}")
+                        print(f"DEBUG: Estimated Pose: {est_pose}")
                         
                         # Print a small section of the grid map around start and goal
                         # Ensure coordinates are within bounds before slicing
@@ -193,15 +225,18 @@ def run():
                 if path:
                     target_waypoint = path[0]
                     dist_to_target = np.linalg.norm(np.array([est_pose[0], est_pose[1]]) - np.array(target_waypoint))
+                    print(f"DEBUG: Dist to target: {dist_to_target:.2f}")
 
                     delta_y = target_waypoint[1] - est_pose[1]
                     delta_x = target_waypoint[0] - est_pose[0]
                     desired_angle = np.arctan2(delta_y, delta_x)
                     angle_diff = (desired_angle - est_pose[2] + np.pi) % (2 * np.pi) - np.pi
+                    print(f"DEBUG: Angle diff: {np.degrees(angle_diff):.2f} degrees")
 
                     # P-controller for turning
-                    kp = 1.0
+                    kp = 2.0
                     turn_speed = kp * angle_diff
+                    print(f"DEBUG: Turn speed: {turn_speed:.2f}")
 
                     # Constant forward speed
                     forward_speed = 5.0
@@ -224,31 +259,64 @@ def run():
                             target_waypoint = path[0] # Update target
 
                 else:
-                    # No path found, enter exploration mode
+                    # No path found or goal reached, enter/continue exploration mode
                     if not exploration_mode:
                         exploration_mode = True
-                        exploration_step_count = 0
-                        print("DEBUG: No path found. Entering exploration mode.")
+                        print("DEBUG: No path found to goal. Entering exploration mode to find unexplored regions.")
+                    
+                    # Find an unexplored target
+                    current_grid_pos = (int(est_pose[0]), int(est_pose[1]))
+                    unexplored_target = find_unexplored_target(grid_map, current_grid_pos)
 
-                    # Exploration logic
-                    if exploration_mode:
+                    if unexplored_target:
+                        print(f"DEBUG: Found unexplored target: {unexplored_target}")
+                        try:
+                            # Plan path to unexplored target
+                            path = astar_search(grid_map, current_grid_pos, unexplored_target)
+                            if len(path) > 1:
+                                print(f"📍 Path to unexplored found: {path[:3]}... (Total length: {len(path)})")
+                                # Reset exploration mode if a path is found
+                                exploration_mode = False
+                                exploration_step_count = 0 # Reset exploration step count
+                            else:
+                                print(f"⚠️ No path found to unexplored target. Path: {path}. Trying simple exploration.")
+                                # Fallback to simple exploration if path planning fails
+                                # This part can be refined further for more sophisticated fallback
+                                if exploration_step_count < 10: # Move forward for 10 steps
+                                    action = 0 # Move forward
+                                elif exploration_step_count < 15: # Then turn left for 5 steps
+                                    action = 1 # Turn left
+                                else:
+                                    exploration_step_count = 0 # Reset cycle
+                                    action = 3 # Stop for a moment
+                                exploration_step_count += 1
+                                apply_robot_action(robot_id, action)
+                        except Exception as e:
+                            print(f"⚠️ Path planning to unexplored failed: {e}. Trying simple exploration.")
+                            # Fallback to simple exploration if path planning fails
+                            if exploration_step_count < 10: # Move forward for 10 steps
+                                action = 0 # Move forward
+                            elif exploration_step_count < 15: # Then turn left for 5 steps
+                                action = 1 # Turn left
+                            else:
+                                exploration_step_count = 0 # Reset cycle
+                                action = 3 # Stop for a moment
+                            exploration_step_count += 1
+                            apply_robot_action(robot_id, action)
+                    else:
+                        print("DEBUG: No unexplored regions found. Performing simple exploration.")
+                        # Fallback to simple exploration if no unexplored target is found
                         if exploration_step_count < 10: # Move forward for 10 steps
                             action = 0 # Move forward
                         elif exploration_step_count < 15: # Then turn left for 5 steps
                             action = 1 # Turn left
                         else:
-                            # Exit exploration mode after a cycle
-                            exploration_mode = False
-                            exploration_step_count = 0
-                            action = 3 # Stop for a moment before re-planning
-                            print("DEBUG: Exploration cycle complete. Stopping.")
+                            exploration_step_count = 0 # Reset cycle
+                            action = 3 # Stop for a moment
                         exploration_step_count += 1
                         apply_robot_action(robot_id, action)
 
-                # Reset exploration mode if a path is found
-                if path:
-                    exploration_mode = False
-                    exploration_step_count = 0
+                
 
             # Update state for next iteration
             prev_pose = current_pose.copy()
