@@ -77,7 +77,20 @@ def run():
 
             # If in collision avoidance mode, skip normal navigation logic
             if collision_avoidance_mode:
-                continue
+                # If still in collision, continue evasive maneuver
+                if np.min(scan) < collision_threshold:
+                    # Re-apply evasive maneuver (no print to avoid spamming)
+                    closest_ray_idx = np.argmin(scan)
+                    turn_direction = 1.0 if closest_ray_idx < LIDAR_RAYS / 2 else -1.0
+                    apply_robot_action(robot_id, 0, forward_speed=-2.0, turn_speed=turn_direction * 2.0)
+                    time.sleep(0.2) # Small pause
+                    continue
+                else:
+                    # Collision avoided, transition out of mode
+                    collision_avoidance_mode = False
+                    exploration_mode = True # Enter exploration mode to find a new path
+                    exploration_step_count = 0
+                    print("✅ Collision avoided. Resuming exploration.")
 
             # Calculate motion since last step (odometry)
             if prev_pose is not None:
