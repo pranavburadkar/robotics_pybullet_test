@@ -68,13 +68,15 @@ def run():
             mcl.measurement_update(scan, grid_map)
             est_pose = mcl.get_estimated_pose()
             
-            # Clip estimated pose to be within map boundaries
-            est_pose[0] = np.clip(est_pose[0], 0, MAP_SIZE[0]-1)
-            est_pose[1] = np.clip(est_pose[1], 0, MAP_SIZE[1]-1)
-
             # (Optional) Refine pose estimate with PL-ICP
             if prev_scan_points is not None:
                 est_pose = pl_icp_correction(scan_points, prev_scan_points, est_pose)
+
+            # Clip estimated pose to be within map boundaries
+            est_pose[0] = np.clip(est_pose[0], 0, MAP_SIZE[0]-1)
+            est_pose[1] = np.clip(est_pose[1], 0, MAP_SIZE[1]-1)
+            
+            # 2. MAPPING (SLAM)
             
             # 2. MAPPING (SLAM)
             slam.update(est_pose, scan)

@@ -14,6 +14,11 @@ class Node:
 def astar_search(occ_grid, start, goal):
     # D* grid search, avoid obstacles
     w, h = occ_grid.shape
+
+    # Check if start and goal are within grid boundaries
+    if not (0 <= start[0] < w and 0 <= start[1] < h and 0 <= goal[0] < w and 0 <= goal[1] < h):
+        return [] # Return empty path if start or goal is out of bounds
+
     open_list = []
     g_score = {}
     

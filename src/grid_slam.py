@@ -28,14 +28,14 @@ class GridSLAM:
                     if r < dist - 0.2:  # Free space
                         self.map[x, y] = max(self.map[x, y] - 0.1, 0)
                     else:  # Occupied space
-                        self.map[x, y] = min(self.map[x, y] + 0.3, 1)
+                        self.map[x, y] = min(self.map[x, y] + 0.8, 1) # Increased occupancy value
                         # Inflate neighbors
-                        for dx in [-1, 0, 1]:
-                            for dy in [-1, 0, 1]:
+                        for dx in [-2, -1, 0, 1, 2]: # Increased inflation radius
+                            for dy in [-2, -1, 0, 1, 2]: # Increased inflation radius
                                 if dx == 0 and dy == 0: continue
                                 nx, ny = x + dx, y + dy
                                 if 0 <= nx < self.map.shape[0] and 0 <= ny < self.map.shape[1]:
-                                    self.map[nx, ny] = min(self.map[nx, ny] + 0.2, 1) # Inflate by a smaller amount
+                                    self.map[nx, ny] = min(self.map[nx, ny] + 0.4, 1) # Inflate by a larger amount
 
     def get_map(self):
         return self.map
