@@ -21,7 +21,7 @@ def _calculate_particle_weight_jit(particle_x, particle_y, particle_theta, lidar
         # Compare expected vs. measured distance using a Gaussian model
         error = measured_dist - expected_dist
         # The smaller the error, the higher the probability (and weight)
-        prob = np.exp(-(error**2) / (2 * 2.0**2))  # Sensor noise variance
+        prob = np.exp(-(error**2) / (2 * 5.0**2))  # Sensor noise variance
         weight *= prob
     return weight
 
