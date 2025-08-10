@@ -18,7 +18,7 @@ class GridSLAM:
                     if r < dist - 0.2:  # Free space
                         self.map[x, y] = max(self.map[x, y] - 0.1, 0)
                     else:  # Occupied space
-                        self.map[x, y] = min(self.map[x, y] + 0.7, 1)
+                        self.map[x, y] = min(self.map[x, y] + 0.3, 1)
 
     def get_map(self):
         return self.map

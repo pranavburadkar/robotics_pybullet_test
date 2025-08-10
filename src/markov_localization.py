@@ -27,7 +27,7 @@ class MarkovLocalization:
             particles.append(Particle(x, y, theta))
         return particles
 
-    def motion_update(self, delta_pose, noise=np.array([0.2, 0.2, 0.1])):
+    def motion_update(self, delta_pose, noise=np.array([0.3, 0.3, 0.15])):
         """
         Update each particle's pose based on a motion model and add noise.
         This is a simplified motion model, not a true EKF.
@@ -72,19 +72,19 @@ class MarkovLocalization:
             # Compare expected vs. measured distance using a Gaussian model
             error = measured_dist - expected_dist
             # The smaller the error, the higher the probability (and weight)
-            prob = np.exp(-(error**2) / (2 * 1.0**2))  # Sensor noise variance
+            prob = np.exp(-(error**2) / (2 * 2.0**2))  # Sensor noise variance
             weight *= prob
         return weight
 
     def _raycast_on_grid(self, particle, angle, grid_map, max_range=5.0):
         """Simulate a Lidar ray on the occupancy grid to find expected distance."""
-        for r in np.arange(0, max_range, 0.1):  # Step along the ray
+        for r in np.arange(0, max_range, 0.05):  # Step along the ray
             x = int(particle.x + r * np.cos(angle))
             y = int(particle.y + r * np.sin(angle))
 
             if not (0 <= x < self.map_shape[0] and 0 <= y < self.map_shape[1]):
                 return max_range  # Ray went out of map bounds
-            if grid_map[x, y] > 0.7:  # Obstacle threshold
+            if grid_map[x, y] > 0.5:  # Obstacle threshold
                 return r  # Ray hit an obstacle
         return max_range  # No obstacle hit within range
 

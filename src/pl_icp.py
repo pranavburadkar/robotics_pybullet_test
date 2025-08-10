@@ -12,15 +12,15 @@ def pl_icp_correction(current_scan_points, previous_scan_points, pose_guess, ite
     # T = [x, y]
     current_x, current_y, current_yaw = pose_guess
     
-    # Initialize transformation (R, t) for ICP
-    R = np.array([[np.cos(0), -np.sin(0)],
-                  [np.sin(0),  np.cos(0)]])
-    t = np.array([0, 0])
+    # Initialize transformation (R, t) for ICP based on pose_guess
+    R = np.array([[np.cos(current_yaw), -np.sin(current_yaw)],
+                  [np.sin(current_yaw),  np.cos(current_yaw)]])
+    t = np.array([current_x, current_y])
+
+    # Apply initial transformation to current_points
+    transformed_current_points = (R @ current_points.T).T + t
 
     for i in range(iterations):
-        # Apply current transformation to current_points
-        transformed_current_points = (R @ current_points.T).T + t
-
         # Find closest points (correspondences)
         # For each point in transformed_current_points, find its nearest neighbor in previous_points
         correspondences = []

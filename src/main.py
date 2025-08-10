@@ -39,6 +39,7 @@ def run():
     prev_scan_points = None
     path = []
     action = 3 # Default action is STOP
+    turn_attempts = 0 # New variable to track consecutive turns when no path is found
 
     try:
         while True:
@@ -142,13 +143,14 @@ def run():
                     angle_diff = (desired_angle - est_pose[2] + np.pi) % (2 * np.pi) - np.pi
 
                     # Prioritize rotation if angle is significantly off
-                    if abs(angle_diff) > 0.1: # Smaller threshold for rotation
+                    if abs(angle_diff) > 0.5: # Smaller threshold for rotation
                         action = 1 if angle_diff > 0 else 2 # Turn right or left
                     elif dist_to_target < 0.5: # If very close to waypoint, pop it
                         path.pop(0)
                         if not path:
                             action = 3 # Stop, path complete
                             print("✅ Goal Reached!")
+                            print(f"DEBUG: Robot stopped at ({est_pose[0]:.2f}, {est_pose[1]:.2f}) because path is complete.")
                         else:
                             target_waypoint = path[0] # Update target
                             action = 0 # Move forward to next waypoint
@@ -156,7 +158,19 @@ def run():
                         action = 0 # Move forward
 
                 else:
-                    action = 3 # No path
+                    # No path found, try turning to find a new path
+                    if turn_attempts < 5: # Limit consecutive turns
+                        action = 1 # Turn left
+                        turn_attempts += 1
+                        print(f"DEBUG: No path found. Attempting to turn (attempt {turn_attempts}).")
+                    else:
+                        action = 3 # Stop if too many turn attempts
+                        turn_attempts = 0 # Reset attempts
+                        print(f"DEBUG: Robot stopped at ({est_pose[0]:.2f}, {est_pose[1]:.2f}) after {turn_attempts} failed turn attempts.")
+                
+                # Reset turn_attempts if a path is found
+                if path:
+                    turn_attempts = 0
 
             apply_robot_action(robot_id, action)
 

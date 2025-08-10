@@ -69,12 +69,17 @@ def get_odometry(robot_id):
 
 def apply_robot_action(robot_id, action):
     """Apply movement commands to robot - FIXED VERSION"""
-    # Get number of joints to understand robot structure
-    num_joints = p.getNumJoints(robot_id)
-    
+    # Get robot's current orientation
+    _, orn = p.getBasePositionAndOrientation(robot_id)
+    euler = p.getEulerFromQuaternion(orn)
+    yaw = euler[2]
+
     # For r2d2, we can either use resetBaseVelocity or control wheel joints if they exist
     if action == 0:  # Move forward
-        p.resetBaseVelocity(robot_id, linearVelocity=[15.0, 0, 0])
+        # Calculate linear velocity components based on current yaw
+        vx = 15.0 * math.cos(yaw)
+        vy = 15.0 * math.sin(yaw)
+        p.resetBaseVelocity(robot_id, linearVelocity=[vx, vy, 0])
         print("Action: Move forward")
     elif action == 1:  # Turn left
         p.resetBaseVelocity(robot_id, linearVelocity=[0, 0, 0], angularVelocity=[0, 0, 6.0])
