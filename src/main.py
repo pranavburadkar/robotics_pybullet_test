@@ -45,6 +45,7 @@ def run():
     turn_attempts = 0 # New variable to track consecutive turns when no path is found
     exploration_mode = False
     exploration_step_count = 0
+    collision_avoidance_mode = False # New state variable
 
     try:
         while True:
@@ -52,6 +53,32 @@ def run():
             current_pose = get_odometry(robot_id)
             scan, scan_points = simulate_lidar(robot_id, LIDAR_RAYS, LIDAR_RANGE, show_lasers=True)
             
+            # Collision Avoidance: Check for imminent collisions
+            collision_threshold = 1.0 # meters (Increased threshold)
+            if np.min(scan) < collision_threshold:
+                print(f"⚠️ COLLISION IMMINENT! Min scan distance: {np.min(scan):.2f}. Initiating evasive maneuver.")
+                collision_avoidance_mode = True
+                # Determine turn direction based on closest obstacle
+                closest_ray_idx = np.argmin(scan)
+                # If closest obstacle is on the left half of LIDAR rays, turn right, else turn left
+                turn_direction = 1.0 if closest_ray_idx < LIDAR_RAYS / 2 else -1.0
+                
+                # Evasive maneuver: Back up and turn
+                apply_robot_action(robot_id, 0, forward_speed=-2.0, turn_speed=turn_direction * 2.0) # Back up and turn aggressively
+                time.sleep(0.5) # Back up for a short duration
+                apply_robot_action(robot_id, 3) # Stop after backing up
+                time.sleep(0.2) # Pause briefly
+                continue # Skip the rest of the loop to prioritize collision avoidance
+            elif collision_avoidance_mode: # If previously in collision avoidance, but now clear
+                collision_avoidance_mode = False
+                exploration_mode = True # Enter exploration mode to find a new path after escaping collision
+                exploration_step_count = 0
+                print("✅ Collision avoided. Entering exploration mode.")
+
+            # If in collision avoidance mode, skip normal navigation logic
+            if collision_avoidance_mode:
+                continue
+
             # Calculate motion since last step (odometry)
             if prev_pose is not None:
                 delta_pose = current_pose - prev_pose

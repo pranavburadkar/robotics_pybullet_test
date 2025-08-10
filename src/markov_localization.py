@@ -60,7 +60,7 @@ class MarkovLocalization:
             particles.append(Particle(x, y, theta))
         return particles
 
-    def motion_update(self, delta_pose, noise=np.array([0.3, 0.3, 0.15])):
+    def motion_update(self, delta_pose, noise=np.array([0.1, 0.1, 0.05])):
         """
         Update each particle's pose based on a motion model and add noise.
         This is a simplified motion model, not a true EKF.
@@ -90,7 +90,7 @@ class MarkovLocalization:
                 p.weight = 1.0 / self.particle_count
         else:
             for p in self.particles:
-                p.weight /= total_weight
+                p.weight /= (total_weight + 1e-12) # Add a small epsilon to prevent division by zero
 
         self._resample_particles()
 

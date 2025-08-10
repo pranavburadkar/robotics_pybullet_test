@@ -30,10 +30,14 @@ def pl_icp_correction(current_scan_points, previous_scan_points, pose_guess, ite
             diff = previous_points - p_curr
             distances = np.sqrt(np.sum(np.square(diff), axis=1))
             closest_idx = np.argmin(distances)
-            correspondences.append((p_curr, previous_points[closest_idx]))
+            
+            # Add a correspondence threshold
+            if distances[closest_idx] < 0.5: # Threshold for good correspondence
+                correspondences.append((p_curr, previous_points[closest_idx]))
         
-        if not correspondences:
-            break # No correspondences found
+        # Only perform update if enough correspondences are found
+        if len(correspondences) < 5: # Minimum number of correspondences
+            break # No correspondences found or too few good ones
 
         # Separate corresponding points
         # Pre-allocate arrays for Numba compatibility
