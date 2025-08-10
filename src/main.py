@@ -11,33 +11,79 @@ import pybullet as p
 
 def find_unexplored_target(grid_map, current_pose_grid):
     """
-    Finds a target point in an unexplored region of the grid map.
-    For simplicity, this version finds a random unknown cell.
-    A more advanced version would find frontiers or largest unknown areas.
+    Finds a target point in an unexplored region of the grid map, prioritizing frontier cells.
     """
+    map_shape_x, map_shape_y = grid_map.shape
     unknown_cells = np.argwhere((grid_map > 0.4) & (grid_map < 0.6)) # Cells close to 0.5 probability
-    
+
     if len(unknown_cells) == 0:
         return None # No unexplored cells found
 
-    # Filter out unknown cells that are too close to the robot's current position
-    # to encourage moving to new areas
-    valid_unknown_cells = []
-    for cell in unknown_cells:
-        dist = np.linalg.norm(cell - current_pose_grid[:2])
-        if dist > 10: # Only consider cells at least 10 grid units away
-            valid_unknown_cells.append(cell)
-    
-    if len(valid_unknown_cells) == 0:
-        # If all unknown cells are too close, just pick a random one from all unknown cells
-        target_cell_idx = np.random.choice(len(unknown_cells))
-        target_cell = unknown_cells[target_cell_idx]
+    frontier_cells = []
+    for ux, uy in unknown_cells:
+        # Check neighbors for known and free cells
+        is_frontier = False
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                if dx == 0 and dy == 0:
+                    continue # Skip self
+                nx, ny = ux + dx, uy + dy
+                if 0 <= nx < map_shape_x and 0 <= ny < map_shape_y:
+                    if grid_map[nx, ny] < 0.4: # Known and free cell
+                        is_frontier = True
+                        break
+            if is_frontier:
+                break
+        if is_frontier:
+            frontier_cells.append((ux, uy))
+
+    target_candidates = []
+    if len(frontier_cells) > 0:
+        target_candidates = frontier_cells
     else:
-        # Pick a random valid unknown cell
-        target_cell_idx = np.random.choice(len(valid_unknown_cells))
-        target_cell = valid_unknown_cells[target_cell_idx]
+        target_candidates = unknown_cells # Fallback to any unknown cell if no frontiers
+
+    valid_target_candidates = []
+    for cell in target_candidates:
+        dist = np.linalg.norm(np.array(cell) - current_pose_grid[:2])
+        if dist > 10: # Only consider cells at least 10 grid units away
+            valid_target_candidates.append(cell)
+    
+    if len(valid_target_candidates) == 0:
+        # If all valid candidates are too close, just pick a random one from all target_candidates
+        if len(target_candidates) > 0:
+            target_cell_idx = np.random.choice(len(target_candidates))
+            target_cell = target_candidates[target_cell_idx]
+        else:
+            return None # No suitable target found
+    else:
+        # Pick a random valid target candidate
+        target_cell_idx = np.random.choice(len(valid_target_candidates))
+        target_cell = valid_target_candidates[target_cell_idx]
 
     return (int(target_cell[0]), int(target_cell[1]))
+
+def find_nearest_free_cell(grid_map, target_x, target_y, search_radius=5):
+    """
+    Finds the nearest free cell (value < 0.5) to the target coordinates within a search radius.
+    """
+    map_x, map_y = grid_map.shape
+    
+    # Check the target cell first
+    if 0 <= target_x < map_x and 0 <= target_y < map_y and grid_map[target_y, target_x] < 0.5:
+        return (target_x, target_y)
+
+    # Expand search outwards in a spiral or square pattern
+    for r in range(1, search_radius + 1):
+        for dx in range(-r, r + 1):
+            for dy in range(-r, r + 1):
+                if abs(dx) != r and abs(dy) != r: # Only check cells on the perimeter of the square
+                    continue
+
+                nx, ny = target_x + dx, target_y + dy
+                if 0 <= nx < map_x and 0 <= ny < map_y and grid_map[ny, nx] < 0.5:
+                    return (nx, ny)
+    return None # No free cell found within radius
 
 def run():
     print("Setting up PyBullet simulation...")
@@ -84,9 +130,9 @@ def run():
             current_pose = get_odometry(robot_id)
             scan, scan_points = simulate_lidar(robot_id, LIDAR_RAYS, LIDAR_RANGE, show_lasers=True)
             
-            # Collision Avoidance: Proximity-based behavior
-            collision_threshold = 0.7 # meters (closer threshold for direct avoidance)
-            warning_threshold = 2.0   # meters (earlier warning for slowdown/gentle turn)
+            # Collision Avoidance: Proactive and Smooth
+            collision_threshold = 1.0 # meters (trigger for decisive avoidance)
+            warning_threshold = 3.0   # meters (trigger for early slowdown and gentle turn)
 
             current_min_scan = np.min(scan)
             
@@ -95,28 +141,24 @@ def run():
             turn_direction = 1.0 if closest_ray_idx < LIDAR_RAYS / 2 else -1.0 # Turn away from obstacle
 
             if current_min_scan < collision_threshold:
-                # Imminent collision: aggressive but not "jumping"
-                print(f"⚠️ COLLISION IMMINENT! Min scan distance: {current_min_scan:.2f}. Initiating evasive maneuver.")
+                # Imminent collision: decisive but smooth turn with slight reverse
+                print(f"⚠️ COLLISION IMMINENT! Min scan distance: {current_min_scan:.2f}. Initiating decisive evasive maneuver.")
                 collision_avoidance_mode = True
-                # Back up slightly and turn
-                forward_speed = -2.0 # Slower reverse
-                turn_speed = turn_direction * 3.0 # Moderate turn
+                # Prioritize turning away, with a slight reverse to create space
+                forward_speed = -1.0 # Very slight reverse
+                turn_speed = turn_direction * 4.0 # More pronounced but still smooth turn
                 apply_robot_action(robot_id, 0, forward_speed=forward_speed, turn_speed=turn_speed)
-                # Continue for a short duration, then let normal loop take over
-                for _ in range(int(0.5 / (1./240.))): # 0.5 second duration
-                    p.stepSimulation()
-                # No 'continue' here, allow normal navigation logic to resume
-                # This makes it less "jumpy" and more continuous
+                # No explicit p.stepSimulation() loop here, let the main loop continue applying this action
             elif current_min_scan < warning_threshold:
-                # Warning zone: slow down and gentle turn
+                # Warning zone: gradual slowdown and gentle turn
                 print(f"🚧 OBSTACLE AHEAD! Min scan distance: {current_min_scan:.2f}. Slowing down and adjusting course.")
                 collision_avoidance_mode = True # Still in avoidance mode, but gentler
                 # Proportional slowdown: closer to obstacle, slower speed
-                forward_speed = 5.0 * (current_min_scan / warning_threshold) # Scale speed down
-                forward_speed = max(1.0, forward_speed) # Ensure minimum forward speed
-                turn_speed = turn_direction * 1.0 # Gentle turn
+                # Linearly interpolate speed from 5.0 (at warning_threshold) to 0.0 (at collision_threshold)
+                forward_speed = 5.0 * ((current_min_scan - collision_threshold) / (warning_threshold - collision_threshold))
+                forward_speed = max(0.0, forward_speed) # Ensure non-negative speed
+                turn_speed = turn_direction * 3.0 # Gentle turn, slightly more than before
                 apply_robot_action(robot_id, 0, forward_speed=forward_speed, turn_speed=turn_speed)
-                # No 'continue', allow normal navigation logic to resume
             elif collision_avoidance_mode: # If previously in avoidance, but now clear
                 collision_avoidance_mode = False
                 exploration_mode = True # Transition to exploration
