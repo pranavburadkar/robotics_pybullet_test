@@ -3,8 +3,18 @@ import numpy as np
 class GridSLAM:
     def __init__(self, map_size):
         self.map = np.zeros(map_size)
+        # Mark boundaries as obstacles
+        rows, cols = map_size
+        self.map[0, :] = 1.0  # Top boundary
+        self.map[rows - 1, :] = 1.0  # Bottom boundary
+        self.map[:, 0] = 1.0  # Left boundary
+        self.map[:, cols - 1] = 1.0  # Right boundary
 
     def update(self, pose, scan):
+        # Ensure pose is within map bounds before updating
+        if not (0 <= pose[0] < self.map.shape[0] and 0 <= pose[1] < self.map.shape[1]):
+            return
+
         # For each lidar beam, mark free cells and end cell as occupied
         for i, dist in enumerate(scan):
             angle = pose[2] + i * (2 * np.pi / len(scan))
@@ -25,7 +35,7 @@ class GridSLAM:
                                 if dx == 0 and dy == 0: continue
                                 nx, ny = x + dx, y + dy
                                 if 0 <= nx < self.map.shape[0] and 0 <= ny < self.map.shape[1]:
-                                    self.map[nx, ny] = min(self.map[nx, ny] + 0.1, 1) # Inflate by a smaller amount
+                                    self.map[nx, ny] = min(self.map[nx, ny] + 0.2, 1) # Inflate by a smaller amount
 
     def get_map(self):
         return self.map

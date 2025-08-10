@@ -25,7 +25,7 @@ def setup_sim(gui=True):
     
     # Obstacle positions
     obstacle_positions = [
-        (8, 8), (12, 12), (12, 5),
+        (8, 8), (11, 11), (12, 5),
         (5, 5), (5, 10), (10, 5)
     ]
     for i, (x, y) in enumerate(obstacle_positions):
@@ -77,8 +77,8 @@ def apply_robot_action(robot_id, action):
     # For r2d2, we can either use resetBaseVelocity or control wheel joints if they exist
     if action == 0:  # Move forward
         # Calculate linear velocity components based on current yaw
-        vx = 25.0 * math.cos(yaw)
-        vy = 25.0 * math.sin(yaw)
+        vx = 15.0 * math.cos(yaw)
+        vy = 15.0 * math.sin(yaw)
         p.resetBaseVelocity(robot_id, linearVelocity=[vx, vy, 0])
         print("Action: Move forward")
     elif action == 1:  # Turn left

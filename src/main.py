@@ -33,8 +33,11 @@ def run():
     print("="*50)
     print("Simulation running! Press Ctrl+C to quit.\n")
     
+    start_time = time.time()
     step_count = 0
-    prev_pose = None
+    prev_pose = get_odometry(robot_id)
+    start_pose = prev_pose
+    total_distance = 0
     prev_scan = None
     prev_scan_points = None
     path = []
@@ -53,6 +56,8 @@ def run():
             if prev_pose is not None:
                 delta_pose = current_pose - prev_pose
                 delta_pose[2] = (delta_pose[2] + np.pi) % (2 * np.pi) - np.pi
+                distance_moved = np.linalg.norm(delta_pose[:2])
+                total_distance += distance_moved
             else:
                 delta_pose = np.zeros(3)
             
@@ -63,6 +68,10 @@ def run():
             mcl.measurement_update(scan, grid_map)
             est_pose = mcl.get_estimated_pose()
             
+            # Clip estimated pose to be within map boundaries
+            est_pose[0] = np.clip(est_pose[0], 0, MAP_SIZE[0]-1)
+            est_pose[1] = np.clip(est_pose[1], 0, MAP_SIZE[1]-1)
+
             # (Optional) Refine pose estimate with PL-ICP
             if prev_scan_points is not None:
                 est_pose = pl_icp_correction(scan_points, prev_scan_points, est_pose)
@@ -151,8 +160,12 @@ def run():
                         path.pop(0)
                         if not path:
                             action = 3 # Stop, path complete
-                            print("✅ Goal Reached!")
-                            print(f"DEBUG: Robot stopped at ({est_pose[0]:.2f}, {est_pose[1]:.2f}) because path is complete.")
+                            time_taken = time.time() - start_time
+                            print("\n" + "="*50)
+                            print(f"🏁 GOAL REACHED! 🏁")
+                            print(f"   - Time Taken: {time_taken:.2f} seconds")
+                            print(f"   - Distance Traveled: {total_distance:.2f} meters")
+                            print("="*50 + "\n")
                         else:
                             target_waypoint = path[0] # Update target
                             action = 0 # Move forward to next waypoint
