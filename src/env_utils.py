@@ -21,7 +21,7 @@ def setup_sim(gui=True):
     
     # Robot start position
     robot_start_pos = [2, 2, 0.1]  # Slightly above ground
-    robot_id = p.loadURDF("r2d2.urdf", robot_start_pos)
+    robot_id = p.loadURDF("husky/husky.urdf", robot_start_pos)
     
     # Obstacle positions
     obstacle_positions = [
@@ -97,7 +97,7 @@ def simulate_lidar(robot_id, num_rays=16, ray_length=5.0, show_lasers=False):
     
     for i in range(num_rays):
         angle = yaw + (i * 2 * math.pi / num_rays)
-        start_pos = [pos[0], pos[1], pos[2] + 0.2]  # Slightly above robot
+        start_pos = [pos[0], pos[1], pos[2] + 0.5]  # Directly above robot, slightly higher
         end_pos = [
             pos[0] + ray_length * math.cos(angle),
             pos[1] + ray_length * math.sin(angle),

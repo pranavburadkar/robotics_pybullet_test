@@ -27,7 +27,7 @@ class MarkovLocalization:
             particles.append(Particle(x, y, theta))
         return particles
 
-    def motion_update(self, delta_pose, noise=np.array([0.1, 0.1, 0.05])):
+    def motion_update(self, delta_pose, noise=np.array([0.2, 0.2, 0.1])):
         """
         Update each particle's pose based on a motion model and add noise.
         This is a simplified motion model, not a true EKF.

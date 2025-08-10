@@ -93,10 +93,40 @@ def run():
                 if not path or step_count % 60 == 0: # Re-plan every 2 seconds or if no path
                     try:
                         current_grid_pos = (int(est_pose[0]), int(est_pose[1]))
+                        print(f"DEBUG: Current Grid Pos: {current_grid_pos}, Goal Coords: {goal_coords}")
+                        print(f"DEBUG: Grid Map Shape: {grid_map.shape}")
+                        
+                        # Print a small section of the grid map around start and goal
+                        # Ensure coordinates are within bounds before slicing
+                        map_x, map_y = grid_map.shape
+                        
+                        start_x, start_y = current_grid_pos
+                        goal_x, goal_y = goal_coords
+
+                        # Define a small window around the start and goal
+                        window_size = 5
+                        
+                        # For start
+                        start_slice_x_min = max(0, start_x - window_size // 2)
+                        start_slice_x_max = min(map_x, start_x + window_size // 2 + 1)
+                        start_slice_y_min = max(0, start_y - window_size // 2)
+                        start_slice_y_max = min(map_y, start_y + window_size // 2 + 1)
+                        
+                        print(f"DEBUG: Grid around start ({start_x},{start_y}):\n{grid_map[start_slice_x_min:start_slice_x_max, start_slice_y_min:start_slice_y_max]}")
+
+                        # For goal
+                        goal_slice_x_min = max(0, goal_x - window_size // 2)
+                        goal_slice_x_max = min(map_x, goal_x + window_size // 2 + 1)
+                        goal_slice_y_min = max(0, goal_y - window_size // 2)
+                        goal_slice_y_max = min(map_y, goal_y + window_size // 2 + 1)
+
+                        print(f"DEBUG: Grid around goal ({goal_x},{goal_y}):\n{grid_map[goal_slice_x_min:goal_slice_x_max, goal_slice_y_min:goal_slice_y_max]}")
+
                         path = astar_search(grid_map, current_grid_pos, goal_coords)
                         if len(path) > 1:
-                            print(f"📍 Path found: {path[:3]}...")
+                            print(f"📍 Path found: {path[:3]}... (Total length: {len(path)})")
                         else:
+                            print(f"⚠️ No path found or path too short. Path: {path}")
                             path = []
                     except Exception as e:
                         print(f"⚠️ Path planning failed: {e}")
@@ -106,24 +136,25 @@ def run():
                     target_waypoint = path[0]
                     dist_to_target = np.linalg.norm(np.array([est_pose[0], est_pose[1]]) - np.array(target_waypoint))
 
-                    if dist_to_target < 1.0: # If close to waypoint
-                        path.pop(0) # Move to next waypoint
+                    delta_y = target_waypoint[1] - est_pose[1]
+                    delta_x = target_waypoint[0] - est_pose[0]
+                    desired_angle = np.arctan2(delta_y, delta_x)
+                    angle_diff = (desired_angle - est_pose[2] + np.pi) % (2 * np.pi) - np.pi
+
+                    # Prioritize rotation if angle is significantly off
+                    if abs(angle_diff) > 0.1: # Smaller threshold for rotation
+                        action = 1 if angle_diff > 0 else 2 # Turn right or left
+                    elif dist_to_target < 0.5: # If very close to waypoint, pop it
+                        path.pop(0)
                         if not path:
                             action = 3 # Stop, path complete
                             print("✅ Goal Reached!")
                         else:
                             target_waypoint = path[0] # Update target
+                            action = 0 # Move forward to next waypoint
+                    else:
+                        action = 0 # Move forward
 
-                    if path:
-                        delta_y = target_waypoint[1] - est_pose[1]
-                        delta_x = target_waypoint[0] - est_pose[0]
-                        desired_angle = np.arctan2(delta_y, delta_x)
-                        angle_diff = (desired_angle - est_pose[2] + np.pi) % (2 * np.pi) - np.pi
-
-                        if abs(angle_diff) > 0.2:
-                            action = 1 if angle_diff > 0 else 2
-                        else:
-                            action = 0
                 else:
                     action = 3 # No path
 
