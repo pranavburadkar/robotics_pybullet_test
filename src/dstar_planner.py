@@ -45,7 +45,7 @@ def astar_search(occ_grid, start, goal):
         for dx, dy in [(-1,0), (1,0), (0,-1), (0,1)]:
             nx, ny = node.x + dx, node.y + dy
             
-            if 0 <= nx < w and 0 <= ny < h and occ_grid[ny, nx] < 0.5: # Ensure the cell is not an obstacle
+            if 0 <= nx < w and 0 <= ny < h and occ_grid[ny, nx] <= 0.5: # Ensure the cell is not an obstacle (allow unknown cells)
                 new_g_score = node.cost + 1
                 
                 if new_g_score < g_score.get((nx, ny), float('inf')):

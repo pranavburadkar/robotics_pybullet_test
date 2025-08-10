@@ -90,7 +90,7 @@ class MarkovLocalization:
                 p.weight = 1.0 / self.particle_count
         else:
             for p in self.particles:
-                p.weight /= (total_weight + 1e-12) # Add a small epsilon to prevent division by zero
+                p.weight /= total_weight
 
         self._resample_particles()
 

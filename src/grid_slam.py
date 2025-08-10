@@ -30,10 +30,10 @@ class GridSLAM:
 
         # Mark boundaries as obstacles
         rows, cols = map_size
-        self.map[0, :] = 100 # A large log-odds value for occupied
-        self.map[rows - 1, :] = 100
-        self.map[:, 0] = 100
-        self.map[:, cols - 1] = 100
+        self.map[0, :] = 1.0 # A large log-odds value for occupied
+        self.map[rows - 1, :] = 1.0
+        self.map[:, 0] = 1.0
+        self.map[:, cols - 1] = 1.0
 
     def update(self, pose, scan):
         # Ensure pose is within map bounds before updating
@@ -41,6 +41,8 @@ class GridSLAM:
             return
 
         _update_map_jit(self.map, pose, scan, self.log_odds_free, self.log_odds_occupied)
+        # Clip log-odds values to prevent overflow and overconfidence
+        self.map = np.clip(self.map, -10.0, 10.0) # Example values, can be tuned
 
     def get_map(self):
         # Convert log-odds map to probability map

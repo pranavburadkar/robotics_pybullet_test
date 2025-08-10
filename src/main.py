@@ -109,8 +109,8 @@ def run():
             est_pose = mcl.get_estimated_pose()
             
             # (Optional) Refine pose estimate with PL-ICP
-            if prev_scan_points is not None:
-                est_pose = pl_icp_correction(scan_points, prev_scan_points, est_pose)
+            # if prev_scan_points is not None:
+            #     est_pose = pl_icp_correction(np.ascontiguousarray(scan_points), np.ascontiguousarray(prev_scan_points), est_pose)
 
             # Clip estimated pose to be within map boundaries
             est_pose[0] = np.clip(est_pose[0], 0, MAP_SIZE[0]-1)

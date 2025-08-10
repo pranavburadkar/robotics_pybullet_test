@@ -5,8 +5,8 @@ from numba import jit
 def pl_icp_correction(current_scan_points, previous_scan_points, pose_guess, iterations=10):
     """Basic 2D Point-to-Point ICP for pose correction."""
     # Extract x, y coordinates, ignoring z for 2D ICP
-    current_points = current_scan_points[:, :2]
-    previous_points = previous_scan_points[:, :2]
+    current_points = np.ascontiguousarray(current_scan_points[:, :2])
+    previous_points = np.ascontiguousarray(previous_scan_points[:, :2])
 
     # Initial transformation from pose_guess
     # Convert pose_guess (x, y, yaw) to a 2D transformation matrix
