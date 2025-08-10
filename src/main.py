@@ -64,10 +64,12 @@ def run():
                 turn_direction = 1.0 if closest_ray_idx < LIDAR_RAYS / 2 else -1.0
                 
                 # Evasive maneuver: Back up and turn
-                apply_robot_action(robot_id, 0, forward_speed=-2.0, turn_speed=turn_direction * 2.0) # Back up and turn aggressively
-                time.sleep(0.5) # Back up for a short duration
+                apply_robot_action(robot_id, 0, forward_speed=-5.0, turn_speed=turn_direction * 5.0) # Back up and turn aggressively
+                for _ in range(int(2.0 / (1./240.))): # 2.0 second duration
+                    p.stepSimulation()
                 apply_robot_action(robot_id, 3) # Stop after backing up
-                time.sleep(0.2) # Pause briefly
+                for _ in range(int(1.0 / (1./240.))): # 1.0 second duration
+                    p.stepSimulation()
                 continue # Skip the rest of the loop to prioritize collision avoidance
             elif collision_avoidance_mode: # If previously in collision avoidance, but now clear
                 collision_avoidance_mode = False
@@ -82,8 +84,12 @@ def run():
                     # Re-apply evasive maneuver (no print to avoid spamming)
                     closest_ray_idx = np.argmin(scan)
                     turn_direction = 1.0 if closest_ray_idx < LIDAR_RAYS / 2 else -1.0
-                    apply_robot_action(robot_id, 0, forward_speed=-2.0, turn_speed=turn_direction * 2.0)
-                    time.sleep(0.2) # Small pause
+                    apply_robot_action(robot_id, 0, forward_speed=0.0, turn_speed=turn_direction * 10.0) # Turn in place aggressively
+                for _ in range(int(1.0 / (1./240.))): # 1.0 second duration
+                    p.stepSimulation()
+                apply_robot_action(robot_id, 3) # Stop after turning
+                for _ in range(int(0.5 / (1./240.))): # 0.5 second duration
+                    p.stepSimulation()
                     continue
                 else:
                     # Collision avoided, transition out of mode
